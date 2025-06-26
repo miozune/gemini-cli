@@ -76,6 +76,7 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
+  openPrivacyNotice: () => void,
 ) => {
   const session = useSessionStats();
   const gitService = useMemo(() => {
@@ -250,6 +251,13 @@ export const useSlashCommandProcessor = (
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => {
           openEditorDialog();
+        },
+      },
+      {
+        name: 'privacy',
+        description: 'display the privacy notice',
+        action: (_mainCommand, _subCommand, _args) => {
+          openPrivacyNotice();
         },
       },
       {
@@ -1015,6 +1023,7 @@ export const useSlashCommandProcessor = (
     setQuittingMessages,
     pendingCompressionItemRef,
     setPendingCompressionItem,
+    openPrivacyNotice,
   ]);
 
   const handleSlashCommand = useCallback(

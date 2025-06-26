@@ -173,3 +173,17 @@ export interface HelpLinkUrl {
   description: string;
   url: string;
 }
+
+export interface GetCodeAssistGlobalUserSettingRequest {
+  cloudaicompanionProject?: string;
+}
+
+export interface SetCodeAssistGlobalUserSettingRequest {
+  cloudaicompanionProject?: string;
+  freeTierDataCollectionOptin: boolean;
+}
+
+export interface CodeAssistGlobalUserSettingResponse {
+  cloudaicompanionProject?: string;
+  freeTierDataCollectionOptin: boolean;
+}

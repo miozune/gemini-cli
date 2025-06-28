@@ -320,6 +320,7 @@ async function connectAndDiscover(
           funcDecl.description ?? '',
           parameterSchema,
           funcDecl.name,
+          toolRegistry.config,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
         ),

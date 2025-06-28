@@ -18,8 +18,11 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  ConfigParameters,
+  MCPServerConfig,
+  ToolAllowListConfig,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import { LoadedSettings, Settings, SettingScope } from './settings.js';
 
 import { Extension } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -165,6 +168,7 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
   sessionId: string,
+  loadedSettings?: LoadedSettings,
 ): Promise<Config> {
   loadEnvironment();
 
@@ -198,6 +202,22 @@ export async function loadCliConfig(
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
   return new Config({
+    settingsCallback: {
+      updateSettings: (
+        key: keyof ConfigParameters | string,
+        value:
+          | string
+          | Record<string, MCPServerConfig>
+          | Record<string, ToolAllowListConfig>
+          | undefined,
+      ) => {
+        loadedSettings?.setValue(
+          SettingScope.User,
+          key as keyof Settings,
+          value,
+        );
+      },
+    },
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
@@ -245,6 +265,7 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    toolAllowList: settings.toolAllowList,
   });
 }
 

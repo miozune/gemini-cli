@@ -79,6 +79,40 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** `false`
   - **Example:** `"autoAccept": true`
 
+- **`toolAllowList`** (object):
+
+  - **Description:** Configures tools to automatically execute without requiring user confirmation on each invocation. This setting persists across sessions, allowing you to permanently approve tools you trust. The configuration supports different granularities of trust: full tool approval, or approval for specific commands/entries.
+  - **Default:** Empty
+  - **Properties:**
+    - **Tool-level approval** (boolean): Set a tool name to `true` to always allow that tool without confirmation.
+    - **Entry-level approval** (array of strings): For tools that operate on different commands or entries, specify an array of allowed values:
+      - For `run_shell_command`: List specific command roots (e.g., `["ls", "git", "npm"]`). Note that approval is managed per command root, so allowing `"git"` will permit all git commands like `git status`, `git commit`, etc.
+      - For `mcp`: List specific MCP tools or servers. You can specify either:
+        - Specific tools: `"server.tool"` (e.g., `"weather.get_forecast"`, `"database.query"`) to allow individual tools
+        - Entire servers: `"server"` (e.g., `"weather"`, `"database"`) to allow all tools from that server
+  - **Notes:**
+    - **Automatic updates:** When you select "Yes, allow always" during a tool confirmation prompt, the CLI automatically updates this setting. Manual editing of this configuration is rarely needed, as the interactive prompts handle most use cases.
+      - For MCP tools, you may see two different confirmation options: "Yes, always allow tool '[tool]' from server '[server]'" (adds specific tool like `server.tool`) or "Yes, always allow all tools from server '[server]'" (adds the server name to allow all its tools).
+    - Tool-level approval (`true`) takes precedence over entry-level approval for the same tool.
+  - **Example:**
+
+    ```json
+    "toolAllowList": {
+      "web_fetch": true,
+      "write_file": true,
+      "run_shell_command": [
+        "date",
+        "ls",
+        "git",
+        "npm"
+      ],
+      "mcp": [
+        "weather",
+        "database.query_users"
+      ]
+    }
+    ```
+
 - **`theme`** (string):
   - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
   - **Default:** `"Default"`

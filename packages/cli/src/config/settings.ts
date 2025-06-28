@@ -13,6 +13,7 @@ import {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  ToolAllowListConfig,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -63,6 +64,9 @@ export interface Settings {
 
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
+
+  // Persistence for "allow always" tool confirmations.
+  toolAllowList?: Record<string, ToolAllowListConfig>;
 
   // Add other settings here.
 }
@@ -119,7 +123,11 @@ export class LoadedSettings {
   setValue(
     scope: SettingScope,
     key: keyof Settings,
-    value: string | Record<string, MCPServerConfig> | undefined,
+    value:
+      | string
+      | Record<string, MCPServerConfig>
+      | Record<string, ToolAllowListConfig>
+      | undefined,
   ): void {
     const settingsFile = this.forScope(scope);
     // @ts-expect-error - value can be string | Record<string, MCPServerConfig>

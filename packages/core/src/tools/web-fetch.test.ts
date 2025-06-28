@@ -13,6 +13,8 @@ describe('WebFetchTool', () => {
   const mockConfig = {
     getApprovalMode: vi.fn(),
     setApprovalMode: vi.fn(),
+    isToolAlwaysAllowed: vi.fn(),
+    setToolAlwaysAllowed: vi.fn(),
   } as unknown as Config;
 
   describe('shouldConfirmExecute', () => {
@@ -81,6 +83,65 @@ describe('WebFetchTool', () => {
       }
 
       expect(setApprovalMode).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT);
+    });
+  });
+
+  describe('allow always functionality', () => {
+    it('should return false from shouldConfirmExecute if tool is always allowed', async () => {
+      const tool = new WebFetchTool({
+        ...mockConfig,
+        isToolAlwaysAllowed: vi.fn().mockReturnValue(true),
+      } as unknown as Config);
+      const params = { prompt: 'fetch https://example.com' };
+
+      const result = await tool.shouldConfirmExecute(params);
+      expect(result).toBe(false);
+    });
+
+    it('should call setToolAlwaysAllowed when onConfirm is called with ProceedAlways', async () => {
+      const setToolAlwaysAllowed = vi.fn();
+      const tool = new WebFetchTool({
+        ...mockConfig,
+        setToolAlwaysAllowed,
+        isToolAlwaysAllowed: vi.fn().mockReturnValue(false),
+      } as unknown as Config);
+      const params = { prompt: 'fetch https://example.com' };
+      const confirmationDetails = await tool.shouldConfirmExecute(params);
+
+      if (
+        confirmationDetails &&
+        typeof confirmationDetails === 'object' &&
+        'onConfirm' in confirmationDetails
+      ) {
+        await confirmationDetails.onConfirm(
+          ToolConfirmationOutcome.ProceedAlways,
+        );
+      }
+
+      expect(setToolAlwaysAllowed).toHaveBeenCalledWith(tool);
+    });
+
+    it('should not call setToolAlwaysAllowed when onConfirm is called with ProceedOnce', async () => {
+      const setToolAlwaysAllowed = vi.fn();
+      const tool = new WebFetchTool({
+        ...mockConfig,
+        setToolAlwaysAllowed,
+        isToolAlwaysAllowed: vi.fn().mockReturnValue(false),
+      } as unknown as Config);
+      const params = { prompt: 'fetch https://example.com' };
+      const confirmationDetails = await tool.shouldConfirmExecute(params);
+
+      if (
+        confirmationDetails &&
+        typeof confirmationDetails === 'object' &&
+        'onConfirm' in confirmationDetails
+      ) {
+        await confirmationDetails.onConfirm(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      }
+
+      expect(setToolAlwaysAllowed).not.toHaveBeenCalled();
     });
   });
 });

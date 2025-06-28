@@ -17,6 +17,7 @@ import {
 import { DiscoveredMCPTool } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import { CallableTool, Part } from '@google/genai';
+import { Config } from '../config/config.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -28,6 +29,11 @@ const mockCallableToolInstance: Mocked<CallableTool> = {
   callTool: mockCallTool as any,
   // Add other methods if DiscoveredMCPTool starts using them
 };
+
+const mockConfig = {
+  isToolAllowedFor: vi.fn(),
+  setToolAllowedFor: vi.fn(),
+} as Partial<Config> as Config;
 
 describe('DiscoveredMCPTool', () => {
   const serverName = 'mock-mcp-server';
@@ -43,8 +49,9 @@ describe('DiscoveredMCPTool', () => {
   beforeEach(() => {
     mockCallTool.mockClear();
     mockToolMethod.mockClear();
-    // Clear allowlist before each relevant test, especially for shouldConfirmExecute
-    (DiscoveredMCPTool as any).allowlist.clear();
+    vi.mocked(mockConfig.isToolAllowedFor).mockClear();
+    vi.mocked(mockConfig.setToolAllowedFor).mockClear();
+    vi.mocked(mockConfig.isToolAllowedFor).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -92,6 +99,7 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined,
         customTimeout,
       );
       expect(tool.timeout).toBe(customTimeout);
@@ -184,6 +192,7 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         serverToolName,
         undefined,
+        undefined,
         true,
       );
       expect(
@@ -191,8 +200,8 @@ describe('DiscoveredMCPTool', () => {
       ).toBe(false);
     });
 
-    it('should return false if server is allowlisted', async () => {
-      (DiscoveredMCPTool as any).allowlist.add(serverName);
+    it('should return false if server is always allowed', async () => {
+      vi.mocked(mockConfig.isToolAllowedFor).mockReturnValue(true);
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -200,15 +209,22 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        mockConfig,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
       ).toBe(false);
+      expect(mockConfig.isToolAllowedFor).toHaveBeenCalledWith(
+        'mcp',
+        serverName,
+      );
     });
 
-    it('should return false if tool is allowlisted', async () => {
-      const toolAllowlistKey = `${serverName}.${serverToolName}`;
-      (DiscoveredMCPTool as any).allowlist.add(toolAllowlistKey);
+    it('should return false if tool is always allowed', async () => {
+      const toolAllowKey = `${serverName}.${serverToolName}`;
+      vi.mocked(mockConfig.isToolAllowedFor).mockImplementation(
+        (tool, entry) => entry === toolAllowKey,
+      );
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -216,13 +232,18 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        mockConfig,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
       ).toBe(false);
+      expect(mockConfig.isToolAllowedFor).toHaveBeenCalledWith(
+        'mcp',
+        toolAllowKey,
+      );
     });
 
-    it('should return confirmation details if not trusted and not allowlisted', async () => {
+    it('should return confirmation details if not trusted and not always allowed', async () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -252,8 +273,10 @@ describe('DiscoveredMCPTool', () => {
         );
       }
     });
+  });
 
-    it('should add server to allowlist on ProceedAlwaysServer', async () => {
+  describe('allow always functionality', () => {
+    it('should add server to allow list when onConfirm is called with ProceedAlwaysServer', async () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -261,6 +284,7 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        mockConfig,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
@@ -276,7 +300,10 @@ describe('DiscoveredMCPTool', () => {
         await confirmation.onConfirm(
           ToolConfirmationOutcome.ProceedAlwaysServer,
         );
-        expect((DiscoveredMCPTool as any).allowlist.has(serverName)).toBe(true);
+        expect(mockConfig.setToolAllowedFor).toHaveBeenCalledWith(
+          'mcp',
+          serverName,
+        );
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
@@ -284,7 +311,7 @@ describe('DiscoveredMCPTool', () => {
       }
     });
 
-    it('should add tool to allowlist on ProceedAlwaysTool', async () => {
+    it('should add tool to allow list when onConfirm is called with ProceedAlwaysTool', async () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -292,8 +319,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        mockConfig,
       );
-      const toolAllowlistKey = `${serverName}.${serverToolName}`;
+      const toolAllowKey = `${serverName}.${serverToolName}`;
       const confirmation = await tool.shouldConfirmExecute(
         {},
         new AbortController().signal,
@@ -306,14 +334,80 @@ describe('DiscoveredMCPTool', () => {
         typeof confirmation.onConfirm === 'function'
       ) {
         await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
-        expect((DiscoveredMCPTool as any).allowlist.has(toolAllowlistKey)).toBe(
-          true,
+        expect(mockConfig.setToolAllowedFor).toHaveBeenCalledWith(
+          'mcp',
+          toolAllowKey,
         );
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
         );
       }
+    });
+
+    it('should not add to allow list when onConfirm is called with ProceedOnce', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        toolNameForModel,
+        baseDescription,
+        inputSchema,
+        serverToolName,
+        mockConfig,
+      );
+      const confirmation = await tool.shouldConfirmExecute(
+        {},
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        expect(mockConfig.setToolAllowedFor).not.toHaveBeenCalled();
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
+    });
+
+    it('should not add to allow list when server is already always allowed', async () => {
+      vi.mocked(mockConfig.isToolAllowedFor).mockReturnValue(true);
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        toolNameForModel,
+        baseDescription,
+        inputSchema,
+        serverToolName,
+        mockConfig,
+      );
+
+      await tool.shouldConfirmExecute({}, new AbortController().signal);
+      expect(mockConfig.setToolAllowedFor).not.toHaveBeenCalled();
+    });
+
+    it('should not add to allow list when tool is already always allowed', async () => {
+      const toolAllowKey = `${serverName}.${serverToolName}`;
+      vi.mocked(mockConfig.isToolAllowedFor).mockImplementation(
+        (tool, entry) => entry === toolAllowKey,
+      );
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        toolNameForModel,
+        baseDescription,
+        inputSchema,
+        serverToolName,
+        mockConfig,
+      );
+
+      await tool.shouldConfirmExecute({}, new AbortController().signal);
+      expect(mockConfig.setToolAllowedFor).not.toHaveBeenCalled();
     });
   });
 });

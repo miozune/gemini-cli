@@ -53,6 +53,8 @@ const mockConfigInternal = {
   getTargetDir: () => rootDir,
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
+  isToolAlwaysAllowed: vi.fn(),
+  setToolAlwaysAllowed: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
@@ -108,6 +110,9 @@ describe('WriteFileTool', () => {
     // Reset mocks before each test
     mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     mockConfigInternal.setApprovalMode.mockClear();
+    mockConfigInternal.isToolAlwaysAllowed.mockClear();
+    mockConfigInternal.setToolAlwaysAllowed.mockClear();
+    mockConfigInternal.isToolAlwaysAllowed.mockReturnValue(false);
     mockEnsureCorrectEdit.mockReset();
     mockEnsureCorrectFileContent.mockReset();
 
@@ -610,6 +615,85 @@ describe('WriteFileTool', () => {
       const result = await tool.execute(params, abortSignal);
 
       expect(result.llmContent).not.toMatch(/User modified the `content`/);
+    });
+  });
+
+  describe('allow always functionality', () => {
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, 'allow_always_test.txt');
+    });
+
+    it('should return false from shouldConfirmExecute if tool is always allowed', async () => {
+      mockConfigInternal.isToolAlwaysAllowed.mockReturnValue(true);
+
+      const params = { file_path: filePath, content: 'test content' };
+      const result = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(result).toBe(false);
+      expect(mockConfigInternal.isToolAlwaysAllowed).toHaveBeenCalledWith(tool);
+    });
+
+    it('should call setToolAlwaysAllowed when onConfirm is called with ProceedAlways', async () => {
+      mockEnsureCorrectFileContent.mockResolvedValue('corrected content');
+
+      const params = { file_path: filePath, content: 'test content' };
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(confirmation).not.toBe(false);
+
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+        expect(mockConfigInternal.setToolAlwaysAllowed).toHaveBeenCalledWith(
+          tool,
+        );
+        expect(mockConfigInternal.setApprovalMode).toHaveBeenCalledWith(
+          ApprovalMode.AUTO_EDIT,
+        );
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
+    });
+
+    it('should not call setToolAlwaysAllowed when onConfirm is called with ProceedOnce', async () => {
+      mockEnsureCorrectFileContent.mockResolvedValue('corrected content');
+
+      const params = { file_path: filePath, content: 'test content' };
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(confirmation).not.toBe(false);
+
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        expect(mockConfigInternal.setToolAlwaysAllowed).not.toHaveBeenCalled();
+        expect(mockConfigInternal.setApprovalMode).not.toHaveBeenCalled();
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
     });
   });
 });

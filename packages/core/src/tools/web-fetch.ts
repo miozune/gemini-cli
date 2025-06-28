@@ -181,7 +181,10 @@ ${textContent}
   async shouldConfirmExecute(
     params: WebFetchToolParams,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (
+      this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT ||
+      this.config.isToolAlwaysAllowed(this)
+    ) {
       return false;
     }
 
@@ -209,6 +212,7 @@ ${textContent}
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+          this.config.setToolAlwaysAllowed(this);
         }
       },
     };

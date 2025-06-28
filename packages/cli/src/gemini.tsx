@@ -99,7 +99,12 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const config = await loadCliConfig(
+    settings.merged,
+    extensions,
+    sessionId,
+    settings,
+  );
 
   // set default fallback to gemini api key
   // this has to go after load cli because thats where the env is set

@@ -26,7 +26,7 @@ vi.mock('../utils/editor.js', () => ({
 
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { EditTool, EditToolParams } from './edit.js';
-import { FileDiff } from './tools.js';
+import { FileDiff, ToolConfirmationOutcome } from './tools.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -56,6 +56,8 @@ describe('EditTool', () => {
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
+      isToolAlwaysAllowed: vi.fn(),
+      setToolAlwaysAllowed: vi.fn(),
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
       // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
@@ -79,8 +81,11 @@ describe('EditTool', () => {
 
     // Reset mocks before each test
     (mockConfig.getApprovalMode as Mock).mockClear();
+    (mockConfig.isToolAlwaysAllowed as Mock).mockClear();
+    (mockConfig.setToolAlwaysAllowed as Mock).mockClear();
     // Default to not skipping confirmation
     (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+    (mockConfig.isToolAlwaysAllowed as Mock).mockReturnValue(false);
 
     // Reset mocks and set default implementation for ensureCorrectEdit
     mockEnsureCorrectEdit.mockReset();
@@ -660,6 +665,115 @@ describe('EditTool', () => {
       expect(tool.getDescription(params)).toBe(
         `${testFileName}: this is a very long old string... => this is a very long new string...`,
       );
+    });
+  });
+
+  describe('allow always functionality', () => {
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, 'allow_always_test.txt');
+      fs.writeFileSync(filePath, 'old content');
+    });
+
+    it('should return false from shouldConfirmExecute if tool is always allowed', async () => {
+      (mockConfig.isToolAlwaysAllowed as Mock).mockReturnValue(true);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const result = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+      expect(result).toBe(false);
+      expect(mockConfig.isToolAlwaysAllowed).toHaveBeenCalledWith(tool);
+    });
+
+    it('should not call setToolAlwaysAllowed when tool is already always allowed', async () => {
+      (mockConfig.isToolAlwaysAllowed as Mock).mockReturnValue(true);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      await tool.shouldConfirmExecute(params, new AbortController().signal);
+      expect(mockConfig.setToolAlwaysAllowed).not.toHaveBeenCalled();
+    });
+
+    it('should call setToolAlwaysAllowed when onConfirm is called with ProceedAlways', async () => {
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: { file_path: filePath, old_string: 'old', new_string: 'new' },
+        occurrences: 1,
+      });
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+        expect(mockConfig.setToolAlwaysAllowed).toHaveBeenCalledWith(tool);
+        expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+          ApprovalMode.AUTO_EDIT,
+        );
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
+    });
+
+    it('should not call setToolAlwaysAllowed when onConfirm is called with ProceedOnce', async () => {
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: { file_path: filePath, old_string: 'old', new_string: 'new' },
+        occurrences: 1,
+      });
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        expect(mockConfig.setToolAlwaysAllowed).not.toHaveBeenCalled();
+        expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
     });
   });
 });

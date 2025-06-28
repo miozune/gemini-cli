@@ -124,7 +124,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private discovery: Promise<void> | null = null;
-  private config: Config;
+  config: Config;
 
   constructor(config: Config) {
     this.config = config;

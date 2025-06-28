@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config } from '../config/config.js';
 import {
   BaseTool,
   ToolResult,
@@ -16,8 +17,6 @@ import { CallableTool, Part, FunctionCall } from '@google/genai';
 type ToolParams = Record<string, unknown>;
 
 export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
-  private static readonly allowlist: Set<string> = new Set();
-
   constructor(
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
@@ -25,6 +24,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
     readonly serverToolName: string,
+    private readonly config?: Config,
     readonly timeout?: number,
     readonly trust?: boolean,
   ) {
@@ -50,8 +50,8 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     }
 
     if (
-      DiscoveredMCPTool.allowlist.has(serverAllowListKey) ||
-      DiscoveredMCPTool.allowlist.has(toolAllowListKey)
+      this.config?.isToolAllowedFor('mcp', serverAllowListKey) ||
+      this.config?.isToolAllowedFor('mcp', toolAllowListKey)
     ) {
       return false; // server and/or tool already allow listed
     }
@@ -64,9 +64,9 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       toolDisplayName: this.name, // Display global registry name exposed to model and user
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-          DiscoveredMCPTool.allowlist.add(serverAllowListKey);
+          this.config?.setToolAllowedFor('mcp', serverAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
-          DiscoveredMCPTool.allowlist.add(toolAllowListKey);
+          this.config?.setToolAllowedFor('mcp', toolAllowListKey);
         }
       },
     };

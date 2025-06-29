@@ -485,8 +485,10 @@ export class Config {
 
   setToolAlwaysAllowed(tool: Tool | string): void {
     const toolName = typeof tool === 'string' ? tool : tool.name;
-    this.toolAllowList[toolName] = true;
-    this.settingsCallback?.updateSettings('toolAllowList', this.toolAllowList);
+    if (this.toolAllowList[toolName] !== true) {
+      this.toolAllowList[toolName] = true;
+      this.settingsCallback?.updateSettings('toolAllowList', this.toolAllowList);
+    }
   }
 
   setToolAllowedFor(tool: Tool | string, entry: string): void {
@@ -499,6 +501,8 @@ export class Config {
       toolConfirmationConfig.push(entry);
     } else if (toolConfirmationConfig !== true) {
       this.toolAllowList[toolName] = [entry];
+    } else {
+      return;
     }
     this.settingsCallback?.updateSettings('toolAllowList', this.toolAllowList);
   }

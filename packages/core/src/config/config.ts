@@ -42,6 +42,8 @@ import {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { Tool } from '../tools/tools.js';
 
+const TOOL_ALLOW_LIST_KEY = 'toolAllowList';
+
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
@@ -487,7 +489,7 @@ export class Config {
     const toolName = typeof tool === 'string' ? tool : tool.name;
     if (this.toolAllowList[toolName] !== true) {
       this.toolAllowList[toolName] = true;
-      this.settingsCallback?.updateSettings('toolAllowList', this.toolAllowList);
+      this.settingsCallback?.updateSettings(TOOL_ALLOW_LIST_KEY, this.toolAllowList);
     }
   }
 
@@ -504,7 +506,7 @@ export class Config {
     } else {
       return;
     }
-    this.settingsCallback?.updateSettings('toolAllowList', this.toolAllowList);
+    this.settingsCallback?.updateSettings(TOOL_ALLOW_LIST_KEY, this.toolAllowList);
   }
 
   async getGitService(): Promise<GitService> {
